@@ -1,0 +1,190 @@
+import pandas as pd
+import numpy as np
+import plotly.graph_objects as go
+import dash
+from dash import dcc, html
+from dash.dependencies import Input, Output
+import plotly.express as px
+import calendar
+
+# Initialize the Dash app
+app = dash.Dash(__name__)
+
+# Specify the file path for consumption and PV production data
+consumption_file_path = "../GREENER/Ense3buildingconsumption.csv"
+pv_file_path = "../GREENER/Ense3buildingPV.csv"
+
+# Read the CSV file for consumption data
+data = pd.read_csv(consumption_file_path, sep=';', header=None, names=['Time', 'Consumption'])
+
+# Parse dates in the 'Time' column for consumption data
+data['Time'] = pd.to_datetime(data['Time'], errors='coerce')
+
+# Filter data for the specified date range for consumption
+start_date = '2023-09-25 00:00:00'
+end_date = '2024-09-25 00:00:00'
+filtered_data = data[(data['Time'] >= start_date) & (data['Time'] < end_date)]
+
+# Remove non-numeric characters from the 'Consumption' column and convert to numeric
+filtered_data['Consumption'] = (
+    filtered_data['Consumption']
+    .str.replace(' kWh', '', regex=False)  # Remove " kWh"
+    .str.replace(',', '', regex=False)     # Remove commas
+    .astype(float)                          # Convert to float
+)
+
+# Ensure filtered data is not empty
+if filtered_data.empty:
+    raise ValueError("No data available for the specified date range.")
+
+# Set the date as the index
+filtered_data.set_index('Time', inplace=True)
+
+# --- Shift the data backward to start from 2023-01-01 00:00:00 ---
+time_shift = pd.to_datetime('2023-01-01 00:00:00') - filtered_data.index[0]
+filtered_data.index = filtered_data.index + time_shift
+
+# --- Reindex for the entire year of 2023 ---
+full_date_range = pd.date_range(start='2023-01-01 00:00:00', end='2023-12-31 23:00:00', freq='H')
+reindexed_data = filtered_data.reindex(full_date_range, method=None)  # Use NaN for missing values
+reindexed_data['Consumption'] = reindexed_data['Consumption'].interpolate(method='linear')  # Linear interpolation
+
+# Reset index so 'Time' is a column and not an index
+reindexed_data.reset_index(inplace=True)
+reindexed_data.rename(columns={'index': 'Time'}, inplace=True)
+
+# Read the PV production data
+pv_data = pd.read_csv(pv_file_path)
+
+# Clean and preprocess PV production data
+pv_data = pv_data.rename(columns={'time': 'Time', 'electricity': 'PVproduction'})
+pv_data = pv_data.drop(columns=['local_time'])
+pv_data['Time'] = pd.to_datetime(pv_data['Time'], errors='coerce')
+
+# Remove the year part, only keep month and day, and sort data
+pv_data['MonthDay'] = pv_data['Time'].dt.strftime('%m-%d')
+pv_data = pv_data.sort_values(by=['MonthDay', 'Time'])
+
+# Create a complete datetime range for 2023 with only month and day (ignoring year)
+date_range = pd.date_range(start='2023-01-01 00:00:00', end='2023-12-31 23:00:00', freq='H')
+processed_data = pd.DataFrame({'Time': date_range})
+
+# Align PV production data with the new datetime range (no year part)
+pv_start = date_range[0]
+pv_data['Time'] = pv_data['Time'] - (pv_data['Time'].min() - pv_start)
+processed_data = processed_data.merge(pv_data, on='Time', how='left')
+
+# Merge combined consumption data with PV production data
+processed_data = processed_data.merge(reindexed_data[['Time', 'Consumption']], on='Time', how='left')
+
+# Fill missing values with interpolation for alignment
+processed_data['PVproduction'] = processed_data['PVproduction'].fillna(0)
+
+# Introduce scaling variable for PV production
+scaling_factor = 500
+processed_data['PVproduction'] *= scaling_factor
+
+# Compute Grid Share and PV Share
+processed_data['GridShare'] = (processed_data['Consumption'] - processed_data['PVproduction']) / processed_data['Consumption']
+processed_data['GridShare'] = processed_data['GridShare'].apply(lambda x: max(0, x))  # Set negative values to zero
+
+processed_data['PVShare'] = processed_data['PVproduction'] / processed_data['Consumption']
+processed_data['PVShare'] = processed_data['PVShare'].apply(lambda x: min(1, x))  # Limit PV Share to 100%
+
+# Calculate Imported Energy (if grid share is > 0, we assume it's imported)
+processed_data['ImportedEnergy'] = processed_data['GridShare'] * processed_data['Consumption']
+
+# Function to create the line graph with highlighted PV surplus
+def plot_line_graph(df, start_date, end_date):
+    # Filter the data based on selected date range
+    df_filtered = df[(df['Time'] >= start_date) & (df['Time'] <= end_date)]
+    
+    # Create figure
+    fig = go.Figure()
+
+    # PV production line
+    fig.add_trace(go.Scatter(
+        x=df_filtered['Time'], y=df_filtered['PVproduction'],
+        mode='lines', name='PV Production', line=dict(color='orange'),
+    ))
+
+    # Consumption line
+    fig.add_trace(go.Scatter(
+        x=df_filtered['Time'], y=df_filtered['Consumption'],
+        mode='lines', name='Consumption', line=dict(color='blue'),
+    ))
+
+    fig.update_layout(
+        title="PV Production vs Consumption",
+        xaxis_title="Time",
+        yaxis_title="Energy (kWh)",
+        hovermode='x unified',  # Show shared hover text
+        showlegend=True
+    )
+
+    return fig
+
+# Create the dropdown options for each month
+dropdown_options_load_pv1 = [
+    {
+        'label': calendar.month_name[month],
+        'method': 'update',
+        'args': [
+            {'visible': [i // 2 == month - 1 for i in range(24)]},  # Toggle visibility
+            {'title': f'PV Production vs. Grid Share for {calendar.month_name[month]}'}
+        ]
+    }
+    for month in range(1, 13)
+]
+
+# Layout of the Dash app with dropdown menu
+app.layout = html.Div([
+    html.H3("PV Production vs Consumption Analysis"),
+    dcc.Dropdown(
+        id='month-dropdown',
+        options=[{'label': calendar.month_name[month], 'value': month} for month in range(1, 13)],
+        value=1,  # Default to January
+        style={'width': '50%'}
+    ),
+    # Dropdown for selecting day within the selected month
+    dcc.Dropdown(
+        id='day-dropdown',
+        style={'width': '50%'}
+    ),
+    
+    # Graph to display the line plot
+    dcc.Graph(id='line-graph'),
+])
+
+# Callback to update graph based on selected month
+@app.callback(
+    Output('day-dropdown', 'options'),
+    [Input('month-dropdown', 'value')]
+)
+def update_day_options(selected_month):
+    # Get the number of days in the selected month
+    num_days = calendar.monthrange(2023, selected_month)[1]
+    
+    # Generate the options for days (1 to 31) based on the selected month
+    return [{'label': str(day), 'value': day} for day in range(1, num_days + 1)]
+
+# Callback to update graph based on selected month and day
+@app.callback(
+    Output('line-graph', 'figure'),
+    [Input('month-dropdown', 'value'),
+     Input('day-dropdown', 'value')]
+)
+def update_graph(selected_month, selected_day):
+    if selected_month and selected_day:
+        # Get the start and end date for the selected month and day
+        month_start = pd.to_datetime(f'2023-{selected_month:02d}-{selected_day:02d} 00:00:00')
+        month_end = month_start + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)  # One full day
+        
+        # Plot the graph for the selected day
+        return plot_line_graph(processed_data, month_start, month_end)
+
+    return {}
+
+# Run the app
+if __name__ == '__main__':
+    app.run_server(debug=True)
