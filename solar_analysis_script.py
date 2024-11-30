@@ -11,9 +11,8 @@ NOCT = 43
 temperature_coefficient = 0.003
 monthly_solar_energy = {1: 2.35, 2: 3.53, 3: 5.02, 4: 5.48, 5: 5.61, 6: 6.16, 7: 6.55, 8: 6.14, 9: 5.4, 10: 3.91, 11: 2.5, 12: 2.02}
 monthly_temperatures = {1: 5.2, 2: 6.3, 3: 10.2, 4: 13.5, 5: 17.2, 6: 21.2, 7: 22.6, 8: 22.4, 9: 18, 10: 15.3, 11: 9.8, 12: 5.9}
-number_of_panels = 630
-battery_capacity = 57
 initial_soc = 50
+battery_capacity_per_unit = 57  # Capacity of each battery in kWh
 
 # Load Data
 def load_data(file_path, start_date, end_date):
@@ -59,12 +58,12 @@ def load_data(file_path, start_date, end_date):
     return filtered_data
 
 # PV Production Calculation 
-def calculate_monthly_pv_production(month, panels):
+def calculate_monthly_pv_production(month, panels, panel_capacity):
     """
-    Calculate PV production per hour for a given month and number of panels.
+    Calculate PV production per hour for a given month, number of panels, and panel capacity.
     Uses a normal distribution profile to simulate daily production from 6 AM to 6 PM.
     """
-    print(f"Calculating monthly PV production for month: {month} with {panels} panels")
+    print(f"Calculating monthly PV production for month: {month} with {panels} panels and panel capacity {panel_capacity}W")
     
     T_ambient = monthly_temperatures[month]
     actual_pv_temp = T_ambient + (NOCT - 20) * (global_irradiance / 800)
@@ -78,7 +77,7 @@ def calculate_monthly_pv_production(month, panels):
     return pd.Series(production_per_hour, index=np.arange(24))
 
 # Annual Metrics Calculation without Battery
-def calculate_annual_metrics(filtered_data, num_panels):
+def calculate_annual_metrics(filtered_data, num_panels, panel_capacity):
     """
     Calculate annual energy metrics without battery storage.
     """
@@ -94,7 +93,7 @@ def calculate_annual_metrics(filtered_data, num_panels):
         month = timestamp.month
 
         # Calculate PV production for the corresponding month (based on the time)
-        pv_production = calculate_monthly_pv_production(month, num_panels)[timestamp.hour]
+        pv_production = calculate_monthly_pv_production(month, num_panels, panel_capacity)[timestamp.hour]
 
         # Calculate energy balance
         if consumption > pv_production:
@@ -120,11 +119,12 @@ def calculate_annual_metrics(filtered_data, num_panels):
     }
 
 # Annual Metrics Calculation with Battery
-def calculate_annual_metrics_with_battery(filtered_data, num_panels, battery_capacity, initial_soc):
+def calculate_annual_metrics_with_battery(filtered_data, num_panels, panel_capacity, num_batteries, initial_soc):
     """
     Calculate annual energy metrics with battery storage.
     """
     print("Calculating annual metrics with battery storage...")
+    battery_capacity = battery_capacity_per_unit * num_batteries  # Total battery capacity in kWh
     annual_pv_produced_kwh = 0
     annual_storage_supplied_kwh = 0
     annual_storage_consumed_kwh = 0
@@ -139,7 +139,7 @@ def calculate_annual_metrics_with_battery(filtered_data, num_panels, battery_cap
         month = timestamp.month
 
         # Calculate PV production for the specific hour
-        hourly_pv_production = calculate_monthly_pv_production(month, num_panels)[timestamp.hour]
+        hourly_pv_production = calculate_monthly_pv_production(month, num_panels, panel_capacity)[timestamp.hour]
         annual_pv_produced_kwh += hourly_pv_production
 
         if current_load > hourly_pv_production:
@@ -183,7 +183,7 @@ def calculate_annual_metrics_with_battery(filtered_data, num_panels, battery_cap
     }
 
 # Monthly Import/Export Calculation
-def monthly_import_export(filtered_data):
+def monthly_import_export(filtered_data, num_panels, panel_capacity):
     """
     Calculate monthly energy import and export based on average daily PV production.
     """
@@ -191,7 +191,7 @@ def monthly_import_export(filtered_data):
     export_kwh = []
     for month in range(1, 13):
         monthly_avg_load = filtered_data[filtered_data.index.month == month].resample('H').mean().groupby(lambda x: x.hour).mean()['Consumption']
-        monthly_pv_production = calculate_monthly_pv_production(month, number_of_panels)
+        monthly_pv_production = calculate_monthly_pv_production(month, num_panels, panel_capacity)
         total_import, total_export = 0, 0
 
         for hour in range(24):
