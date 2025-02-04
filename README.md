@@ -40,4 +40,19 @@ This project explores **strategies** to improve energy **self-sufficiency** (red
 ---
 
 ## 📂 Repository Structure
+- **data/**: Contains CSV files (e.g., consumption, PV, wind generation).  
+- **notebooks/**: Jupyter notebooks for interactive analysis (`main.ipynb`).  
+- **scripts/**: Supporting Python scripts for calculations.  (`solar_analysis_script.py`).
+- **graphs/**: Supporting graphs are made in separate files. (`graphs.ipynb`).
+- **README.md**: Project documentation.  
+
+---
+
+## 🔧 Installation & Dependencies
+
+**Clone** the repository:
+   ```bash
+   git clone https://github.com/arbaz-khalid/Flexibility-Options-in-HVRE.git
+   cd Flexibility-Options-in-HVRE
+
 
