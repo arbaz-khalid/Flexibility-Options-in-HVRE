@@ -48,6 +48,7 @@ This project explores **strategies** to improve energy **self-sufficiency** (red
    git clone https://github.com/arbaz-khalid/Flexibility-Options-in-HVRE.git
    cd Flexibility-Options-in-HVRE
 
-- All important packages like pandas, numpy, plotly, ipywidgets, etc. are already mentioned in the notebook. 
+**Dependencies** 
+The notebook already mentions all important packages, such as pandas, numpy, Plotly, and ipywidgets. 
 
 
