@@ -49,7 +49,7 @@ This project explores **strategies** to improve energy **self-sufficiency** (red
    cd Flexibility-Options-in-HVRE
    ```
 
-**Dependencies** 
+**Dependencies**: 
 The notebook already mentions all important packages, such as pandas, numpy, Plotly, and ipywidgets. 
 
 
