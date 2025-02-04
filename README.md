@@ -40,11 +40,10 @@ This project explores **strategies** to improve energy **self-sufficiency** (red
 ---
 
 ## 📂 Repository Structure
-- **data/**: Contains CSV files (e.g., consumption, PV, wind generation).  
-- **notebooks/**: Jupyter notebooks for interactive analysis (`main.ipynb`).  
-- **scripts/**: Supporting Python scripts for calculations.  (`solar_analysis_script.py`).
-- **graphs/**: Supporting graphs are made in separate files. (`graphs.ipynb`).
-- **README.md**: Project documentation.  
+- **Data**: Contains CSV files (e.g., consumption, PV, wind generation).  
+- **Notebooks**: Jupyter notebooks for interactive analysis (`main.ipynb`).  
+- **Scripts**: Supporting Python scripts for calculations.  (`solar_analysis_script.py`).
+- **Graphs**: Supporting graphs are made in separate files. (`graphs.ipynb`).
 
 ---
 
