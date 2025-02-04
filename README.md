@@ -13,13 +13,7 @@ This repository provides **interactive Jupyter notebooks** and Python scripts to
 - [Project Overview](#project-overview)
 - [Repository Structure](#repository-structure)
 - [Installation & Dependencies](#installation--dependencies)
-- [Usage](#usage)
-  - [1. Data Preparation](#1-data-preparation)
-  - [2. Running the Notebooks](#2-running-the-notebooks)
-  - [3. Interpreting the Results](#3-interpreting-the-results)
-- [Key Files & Scripts](#key-files--scripts)
-- [Contributing](#contributing)
-- [License](#license)
+
 
 ---
 
@@ -53,5 +47,7 @@ This project explores **strategies** to improve energy **self-sufficiency** (red
    ```bash
    git clone https://github.com/arbaz-khalid/Flexibility-Options-in-HVRE.git
    cd Flexibility-Options-in-HVRE
+
+- All important packages like pandas, numpy, plotly, ipywidgets, etc. are already mentioned in the notebook. 
 
 
